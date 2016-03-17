@@ -23,12 +23,15 @@
 # You should have received a copy of the GNU General Public License.
 # If not, see <http://www.gnu.org/licenses/>.
 
+# Changes AGPLv3+
+
 
 ###[ Loading modules ]###
 
 import sys
 import getopt
-from scapy.all import rdpcap, wrpcap, Packet, NoPayload
+from scapy.all import rdpcap, wrpcap, Packet, NoPayload, Ether, UDP
+from collections import defaultdict
 
 
 ###[ Parsing parameter ]###
@@ -195,23 +198,10 @@ def serialize(packet):
     """
     Serialize flattened packet
     """
-    pdict = packet.__dict__
-    
-    # remove mac addresses?
-    if ignore_macs and pdict.get("fields"):
-       if pdict["fields"].get("src"): del pdict["fields"]["src"] 
-       if pdict["fields"].get("dst"): del pdict["fields"]["dst"]
+    hdr = packet.sprintf("%IP.src%:%UDP.sport%->%IP.dst%:%UDP.dport%")
+    dat = packet['UDP']['Raw'].load.encode("HEX")
 
-    if (ignore_source or ignore_source_mac) and pdict.get("fields"):
-        if pdict["fields"].get("src"): del pdict["fields"]["src"] 
-
-    flat_packet = flatten(pdict)
-    serial = ""
-
-    for key in sorted(flat_packet):
-        serial += str(key) + ": " + str(flat_packet[key]) + " | "
-
-    return serial
+    return hdr + ":" + dat
 
 
 def read_dump(pcap_file):
@@ -219,7 +209,8 @@ def read_dump(pcap_file):
     Read PCAP file
     Return dict of packets with serialized flat packet as key
     """
-    dump = {}
+    dump = defaultdict(list)
+    packs = []
     count = 0
 
     if not be_quite:
@@ -232,12 +223,14 @@ def read_dump(pcap_file):
             sys.stdout.flush()
 
         count += 1
-        dump[serialize(packet)] = packet
+        ser = serialize(packet)
+        dump[ser].append(packet)
+        packs.append(packet)
 
     if not be_quite:
         sys.stdout.write("\nFound " + str(count) + " packets\n\n")
 
-    return dump
+    return (dump, packs)
 
 
 ###[ MAIN PART ]###
@@ -251,12 +244,12 @@ for input_file in input_files:
 # Diff the dumps
 diff_counter = 0
 diff_packets = []
-base_dump = dumps.pop(0)
+(base_dump, base_packs) = dumps.pop(0)
 
 if not be_quite:
     print "Diffing packets"
 
-for packet in base_dump.values():
+for packet in base_packs:
     serial_packet = serialize(packet)
     found_packet = False
 
@@ -264,9 +257,12 @@ for packet in base_dump.values():
         sys.stdout.write(":")
         sys.stdout.flush()
     
-    for dump in dumps:
+    for (dump, packs) in dumps:
         if dump.get(serial_packet):
-            del dump[serial_packet]
+            # dump the closest to the time.. if i find the time
+            dump[serial_packet].pop(0)
+            if len(dump[serial_packet]) == 0:
+                del dump[serial_packet]
             found_packet = True
 
     if not diff_only_right and not found_packet:
@@ -275,13 +271,15 @@ for packet in base_dump.values():
         diff_packets.append(packet)
 
 if not diff_only_left:
-    for dump in dumps:
+    for (dump, packs) in dumps:
         if len(dump.values()) > 0:
-            diff_packets.extend(dump.values())
+            for packets in dump.values():
+                print(packets)
+                diff_packets.extend(packets)
 
-            if not be_quite:
-                for packet in dump.values():
-                    print " >>> " + packet.summary()
+                if not be_quite:
+                    for packet in packets:
+                        print " >>> " + packet.summary()
 
 if not be_quite:
     print "\nFound " + str(len(diff_packets)) + " different packets\n"
