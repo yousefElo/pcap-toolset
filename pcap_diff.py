@@ -30,7 +30,7 @@
 
 import sys
 import getopt
-from scapy.all import rdpcap, wrpcap, Packet, NoPayload, Ether, UDP
+from scapy.all import rdpcap, wrpcap, Packet, NoPayload
 from collections import defaultdict
 
 

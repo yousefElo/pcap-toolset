@@ -1,0 +1,12 @@
+language: python
+python:
+  - "2.7"
+install:
+  - "pip install -r requirements.txt"
+  - pip install pyflakes
+
+script:
+  - pyflakes .
+  - python flatten_sctp.py examples/sctp_camel.pcap test_output.pcap
+  - ls -la test_output.pcap
+  - python tests/pcap_check.py test_output.pcap 4
