@@ -12,6 +12,7 @@ def flatten_sctp(file_name):
     for pkt in pcap:
         ip = pkt['IP']
         layer = ip.payload
+        time = pkt.time
         while layer.name != 'NoPayload':
             if layer.name == 'SCTP':
                 sport = layer.sport
@@ -19,7 +20,9 @@ def flatten_sctp(file_name):
                 tag = layer.tag
             if layer.name == 'SCTPChunkData':
                 # re-create the chunkdata as I don't find the routine to just have this data...
-                packets.append(Ether()/IP()/SCTP(sport=sport,dport=dport,tag=tag)/SCTPChunkData(reserved=0, delay_sack=0, unordered=0, beginning=1, ending=1, stream_id=layer.stream_id, proto_id=layer.proto_id, stream_seq=layer.stream_seq, tsn=layer.tsn, data=layer.data))
+                newPkt = Ether()/IP()/SCTP(sport=sport,dport=dport,tag=tag)/SCTPChunkData(reserved=0, delay_sack=0, unordered=0, beginning=1, ending=1, stream_id=layer.stream_id, proto_id=layer.proto_id, stream_seq=layer.stream_seq, tsn=layer.tsn, data=layer.data)
+                newPkt.time = time
+                packets.append(newPkt)
                 seq = seq + 1
             layer = layer.payload
         i = i + 1
