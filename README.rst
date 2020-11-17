@@ -34,8 +34,13 @@ by that.
 
 .. code-block:: bash
 
-    python flatten_sctp.py input.pcap output.pcap
+for a floder a pcap files :
+    python flatten_sctp.py -folder folderpath
 
+for a single pcap file :
+    python flatten_sctp.py -file folderpath
+
+this scripte will create a new folder "_processed" and put output pcap files inside.
 
 License
 =======
